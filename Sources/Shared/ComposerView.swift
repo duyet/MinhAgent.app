@@ -77,6 +77,9 @@ struct ComposerView: View {
             }
             .plainCardSurface(cornerRadius: 10)
         }
+        // Blend the context card, input card, and any floating notices into
+        // one Liquid Glass cluster on iOS 26. Passthrough elsewhere.
+        .glassEffectContainer(spacing: 8)
         .padding(.horizontal, 16)
         .padding(.bottom, 16)
         .onAppear { isInputFocused = true }
@@ -192,13 +195,13 @@ struct ComposerView: View {
                         .foregroundColor(.primary.opacity(0.85))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.06))
-                        .clipShape(Capsule())
+                        .iOSGlassCapsule(interactive: true)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal, 10)
+            .glassEffectContainer(spacing: 6)
         }
         .padding(.top, 6)
         .padding(.bottom, 10)
@@ -463,8 +466,7 @@ struct ComposerView: View {
             }
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(Color.primary.opacity(0.06))
-            .clipShape(Capsule())
+            .iOSGlassCapsule(interactive: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -512,15 +514,19 @@ struct ComposerView: View {
         .contentShape(Rectangle())
     }
 
-    // MARK: Send button — coral when active
+    // MARK: Send button — glass-prominent on iOS 26, coral circle fallback.
     private var sendButton: some View {
         Button(action: send) {
             Image(systemName: "arrow.up")
                 .font(.system(size: AppFont.pt(13), weight: .bold))
                 .foregroundColor(canSend ? .white : .secondary.opacity(0.4))
                 .frame(width: 32, height: 32)
+                #if os(iOS)
+                .iOSGlassBubble(cornerRadius: 16, tint: canSend ? Color.accentCoral.opacity(0.5) : nil)
+                #else
                 .background(canSend ? Color.accentCoral : Color.primary.opacity(0.1))
                 .clipShape(Circle())
+                #endif
         }
         .buttonStyle(PlainButtonStyle())
         .accessibilityLabel("Send message")
@@ -568,7 +574,11 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 7)
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 10, tint: Color.orange.opacity(0.12))
+        #else
         .background(Color.orange.opacity(0.06))
+        #endif
     }
 
     // MARK: Private Cloud Compute placeholder notice
@@ -591,7 +601,11 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 7)
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 10)
+        #else
         .background(Color.primary.opacity(0.03))
+        #endif
     }
 
     // MARK: Missing API key notice — routes to Settings → Cloud Model
@@ -613,7 +627,11 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 7)
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 10)
+        #else
         .background(Color.primary.opacity(0.03))
+        #endif
     }
 
     private var canSend: Bool {

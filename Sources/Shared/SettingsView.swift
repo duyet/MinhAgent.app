@@ -345,12 +345,16 @@ public struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+                #if os(iOS)
+                .iOSGlassBubble(cornerRadius: 10)
+                #else
                 .background(Color.primary.opacity(0.03))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(Color.hairline, lineWidth: 1)
                 )
                 .cornerRadius(10)
+                #endif
             }
 
             Text("Conversations are stored locally on this device and never leave it.")
@@ -653,9 +657,8 @@ public struct SettingsView: View {
 
     /// Connect / Verify / Get-a-key — Liquid Glass buttons grouped so their
     /// highlights merge on iOS 26.
-    @ViewBuilder
     private var connectionButtonGroup: some View {
-        let group = HStack(spacing: 8) {
+        HStack(spacing: 8) {
             Button {
                 viewModel.connectAnyRouter()
             } label: {
@@ -684,15 +687,7 @@ public struct SettingsView: View {
             .liquidGlassButton()
             .controlSize(.small)
         }
-        #if os(iOS)
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) { group }
-        } else {
-            group
-        }
-        #else
-        group
-        #endif
+        .glassEffectContainer(spacing: 8)
     }
 
     private var connectionSymbol: String {
@@ -784,7 +779,7 @@ public struct SettingsView: View {
                 Label("Change", systemImage: "chevron.up.chevron.down")
                     .font(.system(size: AppFont.pt(12), weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .liquidGlassButton()
             .controlSize(.small)
             .popover(isPresented: $showSettingsModelPicker) {
                 ModelPickerPopover(
@@ -913,12 +908,16 @@ public struct SettingsView: View {
                 Divider()
                 metadataRow(label: "Language Match", value: AppleIntelligenceAudit.languageIsLikelySupported(AppleIntelligenceAudit.primaryLanguageID) ? "Supported" : "May be unsupported")
             }
+            #if os(iOS)
+            .iOSGlassBubble(cornerRadius: 8)
+            #else
             .background(Color.cardSurface)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.hairline.opacity(0.5), lineWidth: 1)
             )
+            #endif
         }
     }
 
@@ -939,9 +938,13 @@ public struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(10)
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 8)
+        #else
         .background(Color.primary.opacity(0.03))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.hairline.opacity(0.5), lineWidth: 1))
+        #endif
     }
 
     private var cloudModelDetailsView: some View {
@@ -955,12 +958,16 @@ public struct SettingsView: View {
                 value: viewModel.modelSupportsReasoning ? viewModel.reasoningEffort.capitalized : "Not supported"
             )
         }
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 8)
+        #else
         .background(Color.cardSurface)
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.hairline.opacity(0.5), lineWidth: 1)
         )
+        #endif
     }
 
     private var localToolDetailsView: some View {

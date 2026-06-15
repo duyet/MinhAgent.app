@@ -65,9 +65,7 @@ public struct MainView: View {
                 SidebarView(viewModel: viewModel)
                     .frame(width: drawerWidth)
                     .frame(maxHeight: .infinity)
-                    .background(Color.windowBackground)
-                    .clipShape(
-                        .rect(bottomTrailingRadius: 28, topTrailingRadius: 28, style: .continuous))
+                    .iOSGlassDrawerSurface()
                     .shadow(color: .black.opacity(0.12 * drawerProgress), radius: 16, x: 4, y: 0)
                     .offset(x: drawerOffset)
                     .ignoresSafeArea(edges: .top)
@@ -250,6 +248,8 @@ public struct MainView: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: AppFont.pt(30), weight: .semibold))
                         .foregroundColor(Color.accentCoral)
+                        .frame(width: 56, height: 56)
+                        .iOSGlassIconSurface()
                         .padding(.bottom, 4)
 
                     Text(welcomeHeadline)
@@ -316,9 +316,7 @@ struct PresetPill: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(Color.cardSurface)
-            .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Color.hairline))
+            .iOSGlassCapsule(interactive: true)
             .contentShape(Capsule())
         }
         .buttonStyle(PlainButtonStyle())
@@ -351,11 +349,11 @@ struct StarterCard: View {
             .padding(.vertical, 9)
             #if os(macOS)
             .background(isHovered ? Color.primary.opacity(0.06) : Color.cardSurface)
-            #else
-            .background(Color.cardSurface)
-            #endif
             .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(Color.hairline))
+            #else
+            .iOSGlassCapsule(interactive: true)
+            #endif
             .contentShape(Capsule())
         }
         .buttonStyle(PlainButtonStyle())
@@ -375,9 +373,7 @@ struct MessageRow: View {
     let message: ChatMessage
     @ObservedObject var viewModel: MainViewModel
     @State private var copied = false
-    #if os(macOS)
-    @State private var isHovered = false
-    #endif
+    @Namespace private var glassNamespace
 
     private var isUser: Bool { message.role == "user" }
 
@@ -385,122 +381,100 @@ struct MessageRow: View {
         HStack(alignment: .top, spacing: 0) {
             if isUser { Spacer(minLength: 48) }
 
+            // Per-row GlassEffectContainer so the bubble + meta capsule blend
+            // without crossing LazyVStack recycling boundaries.
             VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
                 if isUser {
-                    VStack(alignment: .leading, spacing: 6) {
-                        // Quick Action header (e.g. "Summarize") when this turn
-                        // came from a preset run on clipboard text.
-                        if let action = message.actionLabel {
-                            HStack(spacing: 5) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.system(size: AppFont.pt(9)))
-                                Text(action)
-                                    .font(.system(size: AppFont.pt(11), weight: .semibold))
-                            }
-                            .foregroundColor(Color.accentCoral)
-                        }
-
-                        if message.isQuote {
-                            // Quoted text, assistant-ui style: a quote glyph +
-                            // italic gray text sitting above the user's words.
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: "quote.opening")
-                                    .font(.system(size: AppFont.pt(12)))
-                                    .foregroundColor(.secondary.opacity(0.6))
-                                    .padding(.top, 1)
-                                Text(message.content)
-                                    .font(.system(size: AppFont.pt(14)))
-                                    .italic()
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        } else {
-                            markdownText
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(Color.primary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    userBubble
                 } else if message.content.isEmpty && viewModel.isStreaming {
                     TypingIndicator(fontScale: viewModel.fontScale)
+                        .iOSGlassCapsule()
                 } else if message.isError {
                     errorCard
                 } else {
-                    HStack(alignment: .top, spacing: 0) {
-                        AgentResponseView(
-                            content: message.content,
-                            renderBlocks: message.renderBlocks,
-                            fontScale: viewModel.fontScale)
-                        // Blinking cursor while streaming
-                        if viewModel.isStreaming {
-                            StreamingCursor()
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.primary.opacity(0.02))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    assistantBubble
                 }
 
-                // Meta row: copy + timestamp + metrics + retry
-                HStack(spacing: 8) {
-                    Button(action: copyMessage) {
-                        Image(systemName: copied ? "checkmark" : "square.on.square")
-                            .font(.system(size: AppFont.pt(10)))
-                            .frame(width: 28, height: 28)
-                            .foregroundColor(copied ? Color.accentCoral : .secondary.opacity(0.7))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .accessibilityLabel(copied ? "Copied" : "Copy message")
-                    #if os(macOS)
-                    .help("Copy")
-                    #endif
-                    Text(message.timestamp, style: .time)
-                        .font(.system(size: AppFont.pt(10)))
-                        .foregroundColor(.secondary.opacity(0.7))
-                    if !isUser, let metrics = message.inferenceMetrics {
-                        MetricsChips(metrics: metrics)
-                    }
-                    if !isUser, message.isError {
-                        Button {
-                            viewModel.retryLastMessage()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: AppFont.pt(10)))
-                                .frame(width: 28, height: 28)
-                                .foregroundColor(.secondary.opacity(0.7))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .accessibilityLabel("Retry")
-                        #if os(macOS)
-                        .help("Retry")
-                        #endif
-                    }
-                }
-                #if os(macOS)
-                .opacity(isHovered || copied ? 1 : 0)
-                #else
-                .opacity(copied ? 1 : 0.5)
-                #endif
+                MessageMetaGlassBar(
+                    message: message,
+                    isUser: isUser,
+                    copied: copied,
+                    namespace: glassNamespace,
+                    viewModel: viewModel,
+                    onCopy: copyMessage
+                )
             }
+            .glassEffectContainer(spacing: 6)
 
             if !isUser { Spacer(minLength: 48) }
         }
-        #if os(macOS)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) { isHovered = hovering }
-        }
-        #else
+        #if os(iOS)
+        // Hover-reveal of the meta bar lives in MessageMetaGlassBar (macOS).
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { copyMessage() }
         #endif
     }
 
-    /// Failed-request presentation: quiet red card with the concise provider
-    /// message instead of a wall of raw JSON.
+    // MARK: - User bubble (tinted glass)
+    private var userBubble: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Quick Action header (e.g. "Summarize") when this turn
+            // came from a preset run on clipboard text.
+            if let action = message.actionLabel {
+                HStack(spacing: 5) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: AppFont.pt(9)))
+                    Text(action)
+                        .font(.system(size: AppFont.pt(11), weight: .semibold))
+                }
+                .foregroundColor(Color.accentCoral)
+            }
+
+            if message.isQuote {
+                // Quoted text, assistant-ui style: a quote glyph +
+                // italic gray text sitting above the user's words.
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "quote.opening")
+                        .font(.system(size: AppFont.pt(12)))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .padding(.top, 1)
+                    Text(message.content)
+                        .font(.system(size: AppFont.pt(14)))
+                        .italic()
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                markdownText
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .iOSGlassBubble(cornerRadius: 16, tint: Color.accentCoral.opacity(0.12))
+    }
+
+    // MARK: - Assistant bubble (plain glass)
+    private var assistantBubble: some View {
+        HStack(alignment: .top, spacing: 0) {
+            AgentResponseView(
+                content: message.content,
+                renderBlocks: message.renderBlocks,
+                fontScale: viewModel.fontScale)
+            // Blinking cursor while streaming
+            if viewModel.isStreaming {
+                StreamingCursor()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .iOSGlassBubble(cornerRadius: 16)
+    }
+
+    // MARK: - Error card (red-tinted glass)
+    /// Failed-request presentation: quiet red glass card with the concise
+    /// provider message instead of a wall of raw JSON.
     private var errorCard: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -513,12 +487,7 @@ struct MessageRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.red.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.red.opacity(0.25))
-        )
+        .iOSGlassBubble(cornerRadius: 12, tint: Color.red.opacity(0.15))
     }
 
     /// Native markdown rendering (inline syntax: bold, italic, code, links).
@@ -563,6 +532,75 @@ struct MessageRow: View {
                 withAnimation { copied = false }
             }
         }
+    }
+}
+
+// MARK: - Message Meta Glass Bar
+/// Per-message action row — copy, timestamp, inference metrics, retry —
+/// floating as a single Liquid Glass capsule under the bubble. Extracted from
+/// `MessageRow` to keep `MainView.swift` under the SwiftUI type-checking limit
+/// (AGENTS.md) and to let the copied-check morph animate within a namespace.
+struct MessageMetaGlassBar: View {
+    let message: ChatMessage
+    let isUser: Bool
+    let copied: Bool
+    let namespace: Namespace.ID
+    @ObservedObject var viewModel: MainViewModel
+    let onCopy: () -> Void
+
+    #if os(macOS)
+    @State private var isHovered = false
+    #endif
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: onCopy) {
+                Image(systemName: copied ? "checkmark" : "square.on.square")
+                    .font(.system(size: AppFont.pt(10)))
+                    .frame(width: 28, height: 28)
+                    .foregroundColor(copied ? Color.accentCoral : .secondary.opacity(0.7))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(copied ? "Copied" : "Copy message")
+            #if os(macOS)
+            .help("Copy")
+            #endif
+            Text(message.timestamp, style: .time)
+                .font(.system(size: AppFont.pt(10)))
+                .foregroundColor(.secondary.opacity(0.7))
+            if !isUser, let metrics = message.inferenceMetrics {
+                MetricsChips(metrics: metrics)
+            }
+            if !isUser, message.isError {
+                Button {
+                    viewModel.retryLastMessage()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: AppFont.pt(10)))
+                        .frame(width: 28, height: 28)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel("Retry")
+                #if os(macOS)
+                .help("Retry")
+                #endif
+            }
+        }
+        #if os(iOS)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .iOSGlassCapsule()
+        // Morph the checkmark toggle within the row's namespace for a smooth
+        // glass transition instead of a hard swap.
+        .glassEffectID("meta", in: namespace)
+        .opacity(copied ? 1 : 0.55)
+        #else
+        .opacity(isHovered || copied ? 1 : 0)
+        #endif
+        #if os(macOS)
+        .onHover { h in withAnimation(.easeOut(duration: 0.15)) { isHovered = h } }
+        #endif
     }
 }
 

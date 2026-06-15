@@ -70,10 +70,12 @@ struct SearchPaletteView: View {
             #if os(macOS)
             .background(Color(nsColor: .controlBackgroundColor))
             #else
-            .background(Color(UIColor.secondarySystemBackground))
+            .iOSGlassBubble(cornerRadius: 16)
             #endif
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            #if os(macOS)
             .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -123,7 +125,13 @@ struct SearchPaletteView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            #if os(iOS)
+            .modifier(SelectedGlassBackground(
+                isSelected: isKeyboardSelected,
+                cornerRadius: 10))
+            #else
             .background(isKeyboardSelected ? Color.primary.opacity(0.07) : Color.clear)
+            #endif
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
