@@ -1,5 +1,36 @@
 import SwiftUI
 
+// MARK: - Selected-glass row background
+/// Shared background for sidebar list rows (ConversationRow, ActionRow):
+/// on iOS 26 the selected row floats as a Liquid Glass capsule; on macOS and
+/// older iOS it falls back to a solid selected/hover fill. Unselected rows
+/// stay transparent so the glass only reads on the active row.
+struct SelectedGlassBackground: ViewModifier {
+    let isSelected: Bool
+    let cornerRadius: CGFloat
+    var macOSHoverFill: Color? = nil  // macOS-only hover tint; nil = no hover
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if isSelected {
+            content.iOSGlassCapsule()
+        } else {
+            content.background(Color.clear, in: RoundedRectangle(cornerRadius: cornerRadius))
+        }
+        #else
+        content
+            .background(solidFill, in: RoundedRectangle(cornerRadius: cornerRadius))
+        #endif
+    }
+
+    #if os(macOS)
+    private var solidFill: Color {
+        if isSelected { return Color.primary.opacity(0.06) }
+        return macOSHoverFill ?? Color.clear
+    }
+    #endif
+}
+
 // MARK: - Sidebar
 /// Flat, minimal sidebar (Codex-style): toolbar icons on the traffic-light line,
 /// pill mode tabs, plain hover rows, Recents list, Settings pinned bottom-left.
@@ -103,17 +134,8 @@ struct SidebarView: View {
     // MARK: Primary navigation — segmented pill tabs
     @ViewBuilder
     private var primaryNavigation: some View {
-        #if os(iOS)
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) {
-                primaryNavigationTabs
-            }
-        } else {
-            primaryNavigationTabs
-        }
-        #else
         primaryNavigationTabs
-        #endif
+            .glassEffectContainer(spacing: 8)
     }
 
     private var primaryNavigationTabs: some View {
@@ -178,8 +200,12 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 30)
+        #if os(iOS)
+        .iOSGlassCapsule()
+        #else
         .background(Color.primary.opacity(0.05))
         .clipShape(.rect(cornerRadius: 8))
+        #endif
         .padding(.horizontal, 10)
     }
 
@@ -207,6 +233,9 @@ struct SidebarView: View {
                 .foregroundColor(.primary)
             Spacer()
             AvatarCircle(initials: sidebarInitials, diameter: 34, color: Color.accentCoral)
+                #if os(iOS)
+                .iOSGlassProminentSurface(cornerRadius: 17, tint: Color.accentCoral.opacity(0.25))
+                #endif
         }
         .padding(.horizontal, 16)
         .frame(height: 44)
@@ -337,8 +366,12 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        #if os(iOS)
+        .iOSGlassBubble(cornerRadius: 8)
+        #else
         .background(Color.primary.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        #endif
     }
 
     /// History buckets in display order. Only non-empty groups are returned;
@@ -522,21 +555,15 @@ private struct SidebarRow: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(rowBackground)
+            #if os(macOS)
+            .background(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+            #endif
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         #if os(macOS)
         .onHover { h in isHovered = h }
-        #endif
-    }
-
-    private var rowBackground: Color {
-        #if os(macOS)
-        return isHovered ? Color.primary.opacity(0.04) : Color.clear
-        #else
-        return Color.clear
         #endif
     }
 }
@@ -601,26 +628,14 @@ private struct ActionRow: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 8) {
-                Image(systemName: preset.sfSymbol)
-                    .font(.system(size: AppFont.pt(11)))
-                    .foregroundColor(.secondary)
-                    .frame(width: 14)
-                Text(preset.name)
-                    .font(.system(size: AppFont.pt(12)))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: AppFont.pt(9), weight: .semibold))
-                    .foregroundColor(.secondary.opacity(0.5))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(rowBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
+            rowContent
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .modifier(SelectedGlassBackground(
+                    isSelected: isSelected,
+                    cornerRadius: 8,
+                    macOSHoverFill: hoverFill))
+                .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .help(preset.name)
@@ -634,12 +649,30 @@ private struct ActionRow: View {
         }
     }
 
-    private var rowBackground: Color {
-        if isSelected { return Color.primary.opacity(0.06) }
+    private var rowContent: some View {
+        HStack(spacing: 8) {
+            Image(systemName: preset.sfSymbol)
+                .font(.system(size: AppFont.pt(11)))
+                .foregroundColor(.secondary)
+                .frame(width: 14)
+            Text(preset.name)
+                .font(.system(size: AppFont.pt(12)))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: AppFont.pt(9), weight: .semibold))
+                .foregroundColor(.secondary.opacity(0.5))
+        }
+    }
+
+    /// macOS-only hover tint; nil on iOS where the background is glass.
+    var hoverFill: Color? {
         #if os(macOS)
-        return isHovered ? Color.primary.opacity(0.04) : Color.clear
+        return isHovered ? Color.primary.opacity(0.04) : nil
         #else
-        return Color.clear
+        return nil
         #endif
     }
 }
@@ -698,8 +731,10 @@ private struct ConversationRow: View {
                     #if os(macOS)
                     .padding(.trailing, 22)
                     #endif
-                    .background(rowBackground)
-                    .clipShape(.rect(cornerRadius: 8))
+                    .modifier(SelectedGlassBackground(
+                        isSelected: isSelected,
+                        cornerRadius: 8,
+                        macOSHoverFill: hoverFill))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -779,12 +814,12 @@ private struct ConversationRow: View {
         #endif
     }
 
-    private var rowBackground: Color {
-        if isSelected { return Color.primary.opacity(0.06) }
+    /// macOS-only hover tint; nil on iOS where the background is glass.
+    var hoverFill: Color? {
         #if os(macOS)
-        return isHovered ? Color.primary.opacity(0.04) : Color.clear
+        return isHovered ? Color.primary.opacity(0.04) : nil
         #else
-        return Color.clear
+        return nil
         #endif
     }
 

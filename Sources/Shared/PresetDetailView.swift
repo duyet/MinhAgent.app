@@ -33,13 +33,16 @@ struct PresetDetailView: View {
                             }
                         } label: {
                             ZStack {
-                                Circle()
-                                    .fill(Color.accentCoral.opacity(0.1))
-                                    .frame(width: 48, height: 48)
                                 Image(systemName: sfSymbol)
                                     .font(.system(size: 20))
                                     .foregroundColor(Color.accentCoral)
                             }
+                            .frame(width: 48, height: 48)
+                            #if os(iOS)
+                            .iOSGlassProminentSurface(cornerRadius: 24, tint: Color.accentCoral.opacity(0.2))
+                            #else
+                            .background(Circle().fill(Color.accentCoral.opacity(0.1)))
+                            #endif
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Change preset icon")
@@ -81,11 +84,17 @@ struct PresetDetailView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .frame(minHeight: 44)
+                            #if os(macOS)
                             .background(Color.accentCoral)
                             .foregroundColor(.white)
                             .cornerRadius(8)
+                            #endif
                         }
+                        #if os(iOS)
+                        .liquidGlassButton(prominent: true)
+                        #else
                         .buttonStyle(.plain)
+                        #endif
                         .accessibilityHint("Starts a new conversation with this preset's instructions")
 
                         // Delete button
@@ -96,10 +105,18 @@ struct PresetDetailView: View {
                             Image(systemName: "trash")
                                 .foregroundColor(.red)
                                 .padding(8)
+                                #if os(iOS)
+                                .iOSGlassProminentSurface(cornerRadius: 8, tint: Color.red.opacity(0.2))
+                                #else
                                 .background(Color.red.opacity(0.15))
                                 .cornerRadius(8)
+                                #endif
                         }
+                        #if os(iOS)
+                        .liquidGlassButton()
+                        #else
                         .buttonStyle(.plain)
+                        #endif
                         .accessibilityLabel("Delete action")
                     }
                     .padding(.bottom, 8)
@@ -119,12 +136,16 @@ struct PresetDetailView: View {
                         TextEditor(text: $systemPrompt)
                             .font(.system(size: AppFont.pt(13), design: .monospaced))
                             .padding(12)
+                            #if os(iOS)
+                            .iOSGlassBubble(cornerRadius: 8)
+                            #else
                             .background(Color.cardSurface)
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.hairline, lineWidth: 1)
                             )
+                            #endif
                             .frame(minHeight: 180)
                             .focused($isPromptFocused)
                             .onChange(of: isPromptFocused) { _, focused in
@@ -150,13 +171,17 @@ struct PresetDetailView: View {
                         }
                     }
                     .padding(16)
+                    #if os(iOS)
+                    .iOSGlassBubble(cornerRadius: 8)
+                    #else
                     .background(Color.primary.opacity(0.02))
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.hairline.opacity(0.5), lineWidth: 1)
                     )
-                    
+                    #endif
+
                     Spacer()
                 }
                 .padding(.horizontal, 20)
